@@ -14,6 +14,14 @@ When using OCR:
 - Verify extracted values make logical sense (prices, quantities, dates)
 
 
+## Input
+
+Find invoice PDFs in this order:
+1. Any PDFs uploaded directly in the conversation
+2. Any mounted/accessible local folder
+3. If neither is clear, ask the user where the invoices are
+
+
 ## What to Extract
 Create a standardized line items table with these columns (in this order):
 
