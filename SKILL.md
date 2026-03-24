@@ -3,6 +3,14 @@ name: pdf-invoice-to-excel
 description: Extracts structured line-item data from invoice PDFs — both text-based and scanned image PDFs — into clean Excel files. One Excel file per invoice. Use when someone uploads invoice PDFs and needs the data in Excel, says "extract line items from this invoice", "convert this invoice to Excel", or explicitly calls /pdf-invoice-to-excel.
 ---
 
+## Input
+
+Find invoice PDFs in this order:
+1. Any PDFs uploaded directly in the conversation
+2. Any mounted/accessible local folder
+3. If neither is clear, ask the user where the invoices are
+
+
 ## Extraction Strategy
 
 Use pdfplumber FIRST to try extracting text (it's fast and works on most digital PDFs - 10x faster than OCR)
@@ -14,39 +22,41 @@ When using OCR:
 - Verify extracted values make logical sense (prices, quantities, dates)
 
 
-## Input
-
-Find invoice PDFs in this order:
-1. Any PDFs uploaded directly in the conversation
-2. Any mounted/accessible local folder
-3. If neither is clear, ask the user where the invoices are
-
 
 ## What to Extract
-Create a standardized line items table with these columns (in this order):
 
-1. **Invoice No** - Extract from invoice header/top (usually labeled "Invoice #", "Invoice No", "INV#")
-2. **Tariff Code / HS Code** - Extract from line items (look for "HS:", "HS Code:", "Tariff:", numbers like "6802 9100" or "9401390000")
-   - If embedded in description (e.g., "Cube in marble (HS: 6802 9100)"), extract it separately
-   - Clean format: remove "HS:" prefix, remove ALL spaces (both prefix, suffix, and middle)
-   - Example: "HS: 6802 9100" → "68029100"
-   - Example: " 9401 3900 00 " → "9401390000"
-3. **DESCRIPTION** - Product/service description WITHOUT the HS code
-   - Remove HS codes, tariff codes from description
-   - Keep core product details (material, size, color, specifications)
-4. **UNIT** - Unit of measurement if present (PCS, KG, M, CTN, SET, etc.)
-   - If quantity shows "33 PCS", extract "PCS" here
-5. **WT** - Weight if present (optional - mark "[NOT FOUND]" if missing)
-6. **AMOUNT** - Total price for this line item (not unit price)
-7. **COO** - Country of Origin
-   - Look at bottom of invoice, in line items, or notes section
-   - Common labels: "Origin:", "Country of Origin:", "Made in:", "COO:"
-   - If same for all items, repeat for each row
+Accuracy is the top priority — take your time and extract every field correctly.
 
-**CRITICAL rules:**
-- **Preserve EVERY line item exactly as shown** - do NOT consolidate or merge items even if they look similar
-- **Different SKU/model/size/color = different line item, always**
-- Skip rows that are clearly headers like "Packaging", "Bank charges", "TOTAL" - only extract actual product/service lines
+### Required Columns (always present, even if value is [NOT FOUND])
+
+| # | Column | What to look for |
+|---|--------|-----------------|
+| 1 | **Invoice No** | Header/top of invoice — "Invoice #", "Invoice No", "INV#", "CI No." |
+| 2 | **Tariff Code / HS Code** | "HS:", "HS Code:", "Tariff:" — strip prefix and ALL spaces: "HS: 6802 9100" → `68029100` |
+| 3 | **Description** | Product description WITHOUT the HS code. Keep material, size, color, specs |
+| 4 | **QTY** | Quantity of units for this line item |
+| 5 | **Unit** | Unit of measure from quantity field — PCS, KG, M, CTN, SET, etc. |
+| 6 | **Amount** | Total price for this line item (not unit price) |
+| 7 | **COO** | Country of Origin — check line items, bottom of invoice, notes section |
+
+### Optional Columns (only add if the invoice contains this data — do not create empty columns)
+
+| Column | What to look for |
+|--------|-----------------|
+| **Material** | Material or composition of the product |
+| **Dimension** | Size or measurements of the product |
+| **FOB Unit Price** | Per-unit price (separate from total amount) |
+| **WT** | Weight per item or total |
+| **Total Package** | Number of packages/cartons |
+| **Total CBM** | Cubic meter volume |
+
+**Key rules:**
+- Preserve every line item exactly as shown — never consolidate or merge rows
+- Different SKU, size, color, or spec = separate row, always
+- Skip non-product rows: "Packaging", "Bank charges", "TOTAL", "Subtotal"
+- If an HS code is embedded in the description (e.g. "Cube in marble (HS: 6802 9100)"), extract it to the Tariff Code column and remove it from Description
+- If COO is the same for all items, repeat it in every row
+- Mark genuinely unclear data as [UNCLEAR] — do not guess
 
 
 ## Examples of Field Extraction
@@ -60,9 +70,14 @@ Create a standardized line items table with these columns (in this order):
 - Look for "Made in China", "Origin: Italy", "COO: India" anywhere in the invoice
 - If all items are from same country, repeat it for every row
 
-**Unit extraction:**
-- Input: "33 PCS" in quantity column
-- UNIT column: `PCS`
+**Unit and QTY extraction:**
+- Input: `"33 PCS"` in quantity column
+- QTY: `33`
+- Unit: `PCS`
+
+**Optional columns in action:**
+- Invoice has Material and Dimension columns → include them
+- Invoice has no weight data → do not create a WT column
 
 **Skip non-product rows:**
 - "Packaging (for Kit Marble Cubes)" → Skip this row
@@ -113,7 +128,8 @@ When multiple invoices are provided, process each one independently.
 For every invoice — no exceptions:
 - Always produce a `.xlsx` file, never just text or JSON
 - One Excel file per invoice
-- The 7-column table must exist even if some cells are `[UNCLEAR]` or `[NOT FOUND]`
+- All required columns must exist even if some cells are `[UNCLEAR]` or `[NOT FOUND]`
+- Only add optional columns if that data actually exists in the invoice
 
 After completing a batch, provide a brief summary:
 - How many invoices were processed
