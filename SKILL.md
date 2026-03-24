@@ -21,7 +21,8 @@ When using OCR:
 - Double-check numbers - common OCR errors: 0/O, 8/3, 1/l, 5/S, 6/b, 9/g
 - Verify extracted values make logical sense (prices, quantities, dates)
 
-
+Dependencies required: pdfplumber, pytesseract, pdf2image, openpyxl, tesseract-ocr, poppler-utils.
+Check if available before importing — install only if missing.
 
 ## What to Extract
 
